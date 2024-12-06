@@ -9,6 +9,7 @@
         private readonly TextGenerateKernel textGenerateKernel;
         private readonly ImageProcessorKernel imageProcessorKernel;
         public string inputFromUser;
+        public int count = 0;
 
         public AIService(TextGenerateKernel kernel, ImageProcessorKernel imageProcessorKernel)
         {
@@ -19,83 +20,55 @@
         public async Task<string> GenerateTextAsync(string message)
         {
             inputFromUser = message;
-            const string collectionName = "ghc-news";
             var textGenerated = new StringBuilder();
-            do
-            {
-                // Generate the prompt
-                var prompt = $@"
-                You are an AI model specialized in dermatological disease prediction based on text analysis and related information. 
-                Use your knowledge of skin conditions, diseases, and visual features.
-                Question: {inputFromUser}
-                Is this information enough for dermatological disease prediction based on the description?
-                If yes, return 'Answer: Yes, Details: [AI response]'. 
-                If no, return 'Answer: No, Details: [List of further questions needed]'.
-                For example : Answer: Yes, Details: You are shaking
-                For example : Answer: No, Details: How long?";
-
-                var arguments = new Dictionary<string, string>
-                {
-                    { "input", inputFromUser },
-                    { "collection", "ghc-images" } // Adjust collection name as needed
-                };
-
-                // Call the AI and parse the response
-                var responseFromAI = this.imageProcessorKernel.InvokePromptStreamingAsync(prompt, arguments);
-                await foreach (var result in responseFromAI)
-                {
-                    textGenerated.Append(result.ToString());
-                }
-                var dictionaryFromResponse = ParseStringToDictionary(textGenerated.ToString());
-                string answer = dictionaryFromResponse["Answer"];
-                string details = dictionaryFromResponse["Details"];
-
-                // Check AI's response
-                if (answer.Equals("Yes", StringComparison.OrdinalIgnoreCase))
-                {
-                    IsBreak = true;
-                    inputFromUser = string.Empty;
-                    return $"{string.Join(", ", details)}";
-                }
-                else if (answer.Equals("No", StringComparison.OrdinalIgnoreCase) && count < 5)
-                {
-                    count++;
-                    inputFromUser = $"{string.Join(", ", message)}. {details}";
-                }
-                else
-                {
-                    inputFromUser = string.Empty;
-                    return $"I don't know!. \nAll Questions Asked: {string.Join(", ", details)}";
-                }
-
-            } while (!IsBreak);
-
-            return "Unexpected exit from loop.";
-        }
-
-        public async Task<string> ImageProcessorAsync(string message)
-        {
-            const string collectionName = "ghc-images";
-            var textGenerated = new StringBuilder();
-
-            // Set up the prompt for Semantic Kernel
-            var prompt = @"
-            Question: {{$input}}
-            If you don't know an answer, say 'I don't know!'";
+            // Generate the prompt
+            var prompt = $@"
+            You are an AI model specialized in dermatological disease prediction based on text analysis and related information. 
+            Use your knowledge of skin conditions, diseases, and visual features. Summary in 100 words
+            Question: {inputFromUser}
+            Answer the question using the memory content: {{{{Recall}}}}
+            Is this information enough for dermatological disease prediction based on the description?
+            If yes, return 'Answer: Yes; Details: [AI response]'. 
+            If no, return 'Answer: No; Details: [List of further questions needed]'.
+            For example : Answer: Yes; Details: You are shaking
+            For example : Answer: No; Details: How long?";
 
             var arguments = new KernelArguments
             {
-                { "input", message },
-                { "collection", collectionName }
+                { "input", inputFromUser },
+                { "collection", "ghc" } // Adjust collection name as needed
             };
 
-            var response = this.imageProcessorKernel.InvokePromptStreamingAsync(prompt, arguments);
-            await foreach (var result in response)
+            // Call the AI and parse the response
+            var responseFromAI = this.textGenerateKernel.InvokePromptStreamingAsync(prompt, arguments);
+            await foreach (var result in responseFromAI)
             {
                 textGenerated.Append(result.ToString());
+                Console.WriteLine(result.ToString());
+            }
+            var dictionaryFromResponse = ParseStringToDictionary(textGenerated.ToString());
+            string answer = dictionaryFromResponse["Answer"];
+            var isSucess = dictionaryFromResponse.TryGetValue("Details", out var details);
+
+            // Check AI's response
+            if (answer.Equals("Yes", StringComparison.OrdinalIgnoreCase) && isSucess)
+            {
+                inputFromUser = string.Empty;
+                return $"{string.Join(", ", details)}";
+            }
+            else if (answer.Equals("No", StringComparison.OrdinalIgnoreCase) && count < 5 && isSucess)
+            {
+                count++;
+                inputFromUser = $"{string.Join(", ", message)}. {details}";
+                return details;
+            }
+            else
+            {
+                inputFromUser = string.Empty;
+                return $"I don't know!.";
             }
 
-            return textGenerated.ToString();
+            return "I don't know!.";
         }
 
         static Dictionary<string, string> ParseStringToDictionary(string input)
@@ -103,7 +76,7 @@
             Dictionary<string, string> dictionary = new Dictionary<string, string>();
 
             // Split the input string by commas to get individual key-value pairs
-            string[] pairs = input.Split(',');
+            string[] pairs = input.Split(';');
 
             foreach (string pair in pairs)
             {

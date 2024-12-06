@@ -38,25 +38,30 @@ public class Program
             var embeddingGenerator = kernel.Services.GetRequiredService<ITextEmbeddingGenerationService>();
             var memory = new SemanticTextMemory(new VolatileMemoryStore(), embeddingGenerator);
 
-            const string collectionName = "ghc-news";
+            const string collectionName = "ghc";
 
-            // Add articles to memory
             var articleList = new List<string>
             {
-                "https://www.linkedin.com/posts/fsoft-ghc_telehealth-telehealth-digitalhealth-activity-7267371560036896768-YIdq",
-                "https://www.linkedin.com/posts/fsoft-ghc_techday2024-digitalhealthcare-telehealth-activity-7265257966428184577-b9sl",
-                "https://www.linkedin.com/posts/fsoft-ghc_ai-ai-data-activity-7264110087042920449--uqE"
+                "https://docs.google.com/document/d/1DhvNyY2zoGTH4XQ8qJjZpX3pKFw7oi4o/edit?usp=sharing"
             };
 
             var htmlWeb = new HtmlWeb();
             foreach (var article in articleList)
             {
-                var htmlDoc = htmlWeb.Load(article);
-                var node = htmlDoc.DocumentNode.Descendants(0)
-                    .FirstOrDefault(n => n.HasClass("attributed-text-segment-list__content"));
+                // Convert to the export format URL
+                var exportUrl = article.Replace("/edit", "/export?format=html");
+
+                var htmlDoc = htmlWeb.Load(exportUrl); // Load the exported HTML content
+                var node = htmlDoc.DocumentNode.Descendants()
+                    .FirstOrDefault(n => n.Name == "body"); // You can adjust this depending on the content structure
+
                 if (node != null)
                 {
-                    memory.SaveInformationAsync(collectionName, node.InnerText, Guid.NewGuid().ToString()).Wait();
+                    // Extract the text content from the body of the document
+                    var documentContent = node.InnerText.Trim();
+
+                    // Save to memory or database
+                    memory.SaveInformationAsync(collectionName, documentContent, Guid.NewGuid().ToString()).Wait();
                 }
             }
 
@@ -83,11 +88,24 @@ public class Program
 
         builder.Services.AddSingleton<AIService>();
 
+        builder.Services.AddCors(options =>
+        {
+            options.AddPolicy("AllowAll", policy =>
+            {
+                policy.AllowAnyOrigin()    // Allow any origin
+                      .AllowAnyHeader()    // Allow any header
+                      .AllowAnyMethod();   // Allow any HTTP method (GET, POST, etc.)
+            });
+        });
+
         builder.Services.AddSwaggerGen();
         // Add controllers
         builder.Services.AddControllers();
 
         var app = builder.Build();
+
+        // Enable the "AllowAll" CORS policy globally
+        app.UseCors("AllowAll");
 
         // Configure the HTTP request pipeline.
         if (app.Environment.IsDevelopment())

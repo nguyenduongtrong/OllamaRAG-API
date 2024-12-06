@@ -17,17 +17,10 @@ namespace AIComunicateAPI.Controllers
             this.aIService = aIService;
         }
 
-        [HttpPost("GenerateText")]
+        [HttpPost]
         public async Task<ActionResult> GenerateText(ReceiveDto receiveDto)
         {
             var response = await this.aIService.GenerateTextAsync(receiveDto.Message);
-            return this.Ok(response);
-        }
-
-        [HttpPost("ImageProcessor")]
-        public async Task<ActionResult> ImageProcessor(ReceiveDto receiveDto)
-        {
-            var response = await this.aIService.ImageProcessorAsync(receiveDto.Message);
             return this.Ok(response);
         }
     }
