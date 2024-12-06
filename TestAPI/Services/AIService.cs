@@ -57,7 +57,7 @@
                     inputFromUser = string.Empty;
                     return $"{string.Join(", ", details)}";
                 }
-                else if (answer.Equals("No", StringComparison.OrdinalIgnoreCase) && count < MaxAttempts)
+                else if (answer.Equals("No", StringComparison.OrdinalIgnoreCase) && count < 5)
                 {
                     count++;
                     inputFromUser = $"{string.Join(", ", message)}. {details}";
