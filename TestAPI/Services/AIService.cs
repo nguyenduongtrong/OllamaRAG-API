@@ -21,10 +21,7 @@
             var textGenerated = new StringBuilder();
 
             // Set up the prompt for Semantic Kernel
-            var prompt = @"
-            Question: {{$input}}
-            Answer the question using the memory content: {{Recall}}
-            If you don't know an answer, say 'I don't know!'";
+            var prompt = this.GetDermatologyPrompt();
 
             var arguments = new KernelArguments
             {
@@ -64,6 +61,20 @@
             }
 
             return textGenerated.ToString();
+        }
+
+        private string GetDermatologyPrompt()
+        {
+            return @"
+                You are an AI model specialized in dermatological disease prediction based on image analysis and related information. 
+                Use your knowledge of skin conditions, diseases, and visual features.
+        
+                Question: {{$input}}
+        
+                Answer: Provide a detailed and medically-informed response based on the memory content: {{Recall}}.
+        
+                If you cannot determine the condition confidently or the question is unrelated to dermatological diseases, respond with: 
+                'I don't know! Please consult a qualified dermatologist for further assistance.'";
         }
     }
 }
