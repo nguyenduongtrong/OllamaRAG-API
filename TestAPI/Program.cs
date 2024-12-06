@@ -14,6 +14,7 @@ using Microsoft.SemanticKernel.Plugins.Memory;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Hosting;
 using AIComunicateAPI.Services;
+using TestAPI.Models;
 
 public class Program
 {
@@ -62,7 +63,22 @@ public class Program
             // Import the text memory plugin into the Kernel.
             kernel.ImportPluginFromObject(new TextMemoryPlugin(memory), "memory");
 
-            return kernel;
+            return new TextGenerateKernel(kernel);
+        });
+
+        // Register necessary services for Semantic Kernel
+        builder.Services.AddSingleton(serviceProvider =>
+        {
+            var kernelBuilder = Kernel.CreateBuilder();
+            kernelBuilder.AddOpenAIChatCompletion(
+                modelId: "llava",
+                endpoint: new Uri("http://localhost:11434"),
+                apiKey: "apikey"
+            );
+            kernelBuilder.AddLocalTextEmbeddingGeneration();
+            var kernel = kernelBuilder.Build();
+
+            return new ImageProcessorKernel(kernel);
         });
 
         builder.Services.AddSingleton<AIService>();
